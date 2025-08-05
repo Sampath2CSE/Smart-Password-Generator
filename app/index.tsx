@@ -18,7 +18,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';import { generatePasswords, analyzePolicyAndGenerate } from '../services/passwordService';
+import * as Clipboard from 'expo-clipboard';
+import { generatePasswords, analyzePolicyAndGenerate } from '../services/passwordService';
 import { calculatePasswordStrength, PasswordStrength } from '../services/passwordStrengthService';
 import { 
   generatePasswordFromPattern, 
