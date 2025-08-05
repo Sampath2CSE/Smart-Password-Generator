@@ -15,10 +15,10 @@ import {
   ActivityIndicator,
   Modal,
   FlatList,
+  Clipboard as RNClipboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
 import { generatePasswords, analyzePolicyAndGenerate } from '../services/passwordService';
 import { calculatePasswordStrength, PasswordStrength } from '../services/passwordStrengthService';
 import { 
@@ -158,9 +158,34 @@ export default function PasswordGenerator() {
     }
   }, [selectedPassword]);
   const copyToClipboard = async (password: string) => {
-    await Clipboard.setStringAsync(password);
-    Alert.alert('Success', 'Password copied to clipboard!');
+    try {
+      if (Platform.OS === 'web') {
+        await navigator.clipboard.writeText(password);
+      } else {
+        RNClipboard.setString(password);
+      }
+      showAlert('Success', 'Password copied to clipboard!');
+    } catch (error) {
+      console.error('Clipboard error:', error);
+      showAlert('Error', 'Failed to copy to clipboard');
+    }
   };
+
+  // Cross-platform alert function
+  const showAlert = (title: string, message: string) => {
+    if (Platform.OS === 'web') {
+      setAlertConfig({ visible: true, title, message });
+    } else {
+      Alert.alert(title, message);
+    }
+  };
+
+  // Web alert state
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+  }>({ visible: false, title: '', message: '' });
 
   const StrengthMeter = ({ strength }: { strength: PasswordStrength }) => (
     <View style={styles.strengthMeter}>
@@ -486,6 +511,24 @@ export default function PasswordGenerator() {
             </View>
           )}
           
+          {/* Web Alert Modal */}
+          {Platform.OS === 'web' && (
+            <Modal visible={alertConfig.visible} transparent animationType="fade">
+              <View style={styles.alertOverlay}>
+                <View style={styles.alertContainer}>
+                  <Text style={styles.alertTitle}>{alertConfig.title}</Text>
+                  <Text style={styles.alertMessage}>{alertConfig.message}</Text>
+                  <TouchableOpacity 
+                    style={styles.alertButton}
+                    onPress={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+                  >
+                    <Text style={styles.alertButtonText}>OK</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Modal>
+          )}
+
           <Modal
             visible={patternModalVisible}
             animationType="slide"
@@ -912,5 +955,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#155724',
     lineHeight: 20,
+  },
+  alertOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  alertContainer: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 8,
+    minWidth: 280,
+    maxWidth: 340,
+    margin: 20,
+  },
+  alertTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  alertMessage: {
+    fontSize: 16,
+    marginBottom: 20,
+    color: '#666',
+  },
+  alertButton: {
+    backgroundColor: '#007AFF',
+    padding: 10,
+    borderRadius: 4,
+    alignItems: 'center',
+  },
+  alertButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });

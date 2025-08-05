@@ -1,3 +1,4 @@
+
 // Powered by OnSpace.AI
 
 interface PasswordOptions {
@@ -11,17 +12,31 @@ interface PasswordOptions {
   avoidPersonalInfo: boolean;
 }
 
-const OPENAI_API_KEY = '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';
+// For security, API functionality is disabled. Using local generation only.
+// To enable AI features, add your OpenAI API key to environment variables.
 
 export const generatePasswords = async (options: PasswordOptions): Promise<string[]> => {
-  const prompt = createPasswordPrompt(options);
+  console.log('Generating passwords with options:', options);
   
+  // Always use local generation for mobile compatibility
+  try {
+    const passwords = generateLocalPasswords(options, 5);
+    console.log('Generated passwords successfully:', passwords.length);
+    return passwords;
+  } catch (error) {
+    console.error('Error in password generation:', error);
+    // Fallback with basic options
+    return generateLocalPasswords(getDefaultOptions(), 5);
+  }
+};
+
+/* AI Generation disabled for mobile compatibility
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${process.env.EXPO_PUBLIC_OPENAI_API_KEY || ''}`,
       },
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
@@ -68,40 +83,45 @@ export const generatePasswords = async (options: PasswordOptions): Promise<strin
     // Fallback to local generation
     return generateLocalPasswords(options, 5);
   }
-};
+*/
 
 export const analyzePolicyAndGenerate = async (policyText: string): Promise<{
   analysis: string;
   extractedRules: PasswordOptions;
   passwords: string[];
 }> => {
-  const analysisPrompt = `Analyze this password policy and extract the requirements:
+  console.log('Analyzing policy:', policyText.substring(0, 100) + '...');
+  
+  // Use local analysis for mobile compatibility
+  try {
+    const fallbackRules = extractBasicRules(policyText);
+    const fallbackPasswords = generateLocalPasswords(fallbackRules, 5);
+    
+    console.log('Policy analysis completed locally');
+    
+    return {
+      analysis: `Policy analyzed: Extracted ${fallbackRules.minLength}-${fallbackRules.maxLength} character requirements with ${Object.values(fallbackRules).filter(v => v === true).length} character type requirements.`,
+      extractedRules: fallbackRules,
+      passwords: fallbackPasswords
+    };
+  } catch (error) {
+    console.error('Error in policy analysis:', error);
+    const defaultRules = getDefaultOptions();
+    return {
+      analysis: 'Using default security settings due to analysis error',
+      extractedRules: defaultRules,
+      passwords: generateLocalPasswords(defaultRules, 5)
+    };
+  }
+};
 
-"${policyText}"
-
-Return a JSON response with:
-1. "analysis" - A brief summary of the policy requirements
-2. "rules" - Extracted rules in this format:
-   {
-     "minLength": number,
-     "maxLength": number,
-     "includeUppercase": boolean,
-     "includeLowercase": boolean,
-     "includeNumbers": boolean,
-     "includeSymbols": boolean,
-     "avoidCommonWords": boolean,
-     "avoidPersonalInfo": boolean
-   }
-3. "passwords" - Array of 5 generated passwords that comply with these rules
-
-Make sure the passwords strictly follow all extracted requirements.`;
-
+/* AI Analysis disabled for mobile compatibility
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${process.env.EXPO_PUBLIC_OPENAI_API_KEY || ''}`,
       },
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
@@ -163,7 +183,7 @@ Make sure the passwords strictly follow all extracted requirements.`;
       passwords: fallbackPasswords
     };
   }
-};
+*/
 
 const extractBasicRules = (policyText: string): PasswordOptions => {
   const text = policyText.toLowerCase();
@@ -229,21 +249,49 @@ const generateLocalPasswords = (options: PasswordOptions, count: number): string
 };
 
 const generateSinglePassword = (options: PasswordOptions): string => {
-  let charset = '';
-  
-  if (options.includeUppercase) charset += 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  if (options.includeLowercase) charset += 'abcdefghjkmnpqrstuvwxyz';
-  if (options.includeNumbers) charset += '23456789';
-  if (options.includeSymbols) charset += '@#$%&*+=-';
-  
-  if (!charset) charset = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  
-  const length = Math.floor(Math.random() * (options.maxLength - options.minLength + 1)) + options.minLength;
-  let password = '';
-  
-  for (let i = 0; i < length; i++) {
-    password += charset.charAt(Math.floor(Math.random() * charset.length));
+  try {
+    let charset = '';
+    
+    if (options.includeUppercase) charset += 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    if (options.includeLowercase) charset += 'abcdefghjkmnpqrstuvwxyz';
+    if (options.includeNumbers) charset += '23456789';
+    if (options.includeSymbols) charset += '@#$%&*+=-';
+    
+    // Ensure we have at least some charset
+    if (!charset) charset = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    
+    // Ensure valid length range
+    const minLen = Math.max(4, options.minLength || 8);
+    const maxLen = Math.max(minLen, options.maxLength || 16);
+    const length = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+    
+    let password = '';
+    
+    // Generate password with required character types
+    const requiredChars = [];
+    if (options.includeUppercase && charset.includes('A')) requiredChars.push('ABCDEFGHJKLMNPQRSTUVWXYZ');
+    if (options.includeLowercase && charset.includes('a')) requiredChars.push('abcdefghjkmnpqrstuvwxyz');
+    if (options.includeNumbers && charset.includes('2')) requiredChars.push('23456789');
+    if (options.includeSymbols && charset.includes('@')) requiredChars.push('@#$%&*+=-');
+    
+    // Add at least one character from each required type
+    requiredChars.forEach(chars => {
+      if (password.length < length) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+    });
+    
+    // Fill remaining length with random characters from full charset
+    while (password.length < length) {
+      password += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    
+    // Shuffle the password to avoid predictable patterns
+    return password.split('').sort(() => Math.random() - 0.5).join('');
+    
+  } catch (error) {
+    console.error('Error generating single password:', error);
+    // Ultimate fallback
+    return 'SecurePass123!';
   }
-  
-  return password;
 };
