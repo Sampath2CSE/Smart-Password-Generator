@@ -15,8 +15,8 @@ import {
   ActivityIndicator,
   Modal,
   FlatList,
-  Clipboard as RNClipboard,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { generatePasswords, analyzePolicyAndGenerate } from '../services/passwordService';
@@ -46,6 +46,8 @@ interface GeneratedPassword {
 }
 
 export default function PasswordGenerator() {
+  console.log('PasswordGenerator component initializing');
+  
   const [options, setOptions] = useState<PasswordOptions>({
     minLength: 12,
     maxLength: 16,
@@ -67,7 +69,9 @@ export default function PasswordGenerator() {
   const [policyAnalysis, setPolicyAnalysis] = useState('');
   const [policyModalVisible, setPolicyModalVisible] = useState(false);
   const [policyLoading, setPolicyLoading] = useState(false);
-  const [generationMethod, setGenerationMethod] = useState<'manual' | 'pattern' | 'policy'>('manual');  const handleGeneratePasswords = async () => {
+  const [generationMethod, setGenerationMethod] = useState<'manual' | 'pattern' | 'policy'>('manual');    const handleGeneratePasswords = async () => {
+    console.log('Starting password generation with method:', generationMethod);
+    
     if (generationMethod === 'pattern') {
       handleGeneratePatternPasswords();
       return;
@@ -80,14 +84,37 @@ export default function PasswordGenerator() {
 
     setLoading(true);
     try {
+      console.log('Generating passwords with options:', options);
       const generatedPasswords = await generatePasswords(options);
-      const passwordsWithStrength = generatedPasswords.map(password => ({
-        value: password,
-        strength: calculatePasswordStrength(password)
-      }));
+      console.log('Generated passwords count:', generatedPasswords.length);
+      
+      const passwordsWithStrength = generatedPasswords.map(password => {
+        try {
+          return {
+            value: password,
+            strength: calculatePasswordStrength(password)
+          };
+        } catch (strengthError) {
+          console.error('Error calculating strength for password:', strengthError);
+          return {
+            value: password,
+            strength: {
+              score: 50,
+              level: 'Fair' as const,
+              color: '#ffaa00',
+              entropy: 30,
+              feedback: ['Unable to analyze strength'],
+              timeToCrack: 'Unknown'
+            }
+          };
+        }
+      });
+      
       setPasswords(passwordsWithStrength);
+      console.log('Password generation completed successfully');
     } catch (error) {
-      Alert.alert('Error', 'Failed to generate passwords. Please try again.');
+      console.error('Error in handleGeneratePasswords:', error);
+      showAlert('Error', 'Failed to generate passwords. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -117,34 +144,82 @@ export default function PasswordGenerator() {
     }
   };
 
-  const handleGeneratePatternPasswords = () => {
-    const patternValidation = validatePattern(customPattern);
+    const handleGeneratePatternPasswords = () => {
+    console.log('Generating pattern passwords with pattern:', customPattern);
     
-    if (!patternValidation.isValid) {
-      Alert.alert('Invalid Pattern', patternValidation.errors.join('\n'));
-      return;
-    }
+    try {
+      const patternValidation = validatePattern(customPattern);
+      
+      if (!patternValidation.isValid) {
+        showAlert('Invalid Pattern', patternValidation.errors.join('\n'));
+        return;
+      }
 
-    setLoading(true);
-    
-    setTimeout(() => {
-      const generatedPasswords = Array.from({ length: 5 }, () => 
-        generatePasswordFromPattern(customPattern)
-      );
+      setLoading(true);
       
-      const passwordsWithStrength = generatedPasswords.map(password => ({
-        value: password,
-        strength: calculatePasswordStrength(password)
-      }));
-      
-      setPasswords(passwordsWithStrength);
+      setTimeout(() => {
+        try {
+          const generatedPasswords = Array.from({ length: 5 }, () => 
+            generatePasswordFromPattern(customPattern)
+          );
+          
+          const passwordsWithStrength = generatedPasswords.map(password => {
+            try {
+              return {
+                value: password,
+                strength: calculatePasswordStrength(password)
+              };
+            } catch (strengthError) {
+              console.error('Error calculating pattern password strength:', strengthError);
+              return {
+                value: password,
+                strength: {
+                  score: 50,
+                  level: 'Fair' as const,
+                  color: '#ffaa00',
+                  entropy: 30,
+                  feedback: ['Unable to analyze strength'],
+                  timeToCrack: 'Unknown'
+                }
+              };
+            }
+          });
+          
+          setPasswords(passwordsWithStrength);
+          console.log('Pattern password generation completed successfully');
+        } catch (error) {
+          console.error('Error generating pattern passwords:', error);
+          showAlert('Error', 'Failed to generate pattern passwords. Please try again.');
+        } finally {
+          setLoading(false);
+        }
+      }, 500);
+    } catch (error) {
+      console.error('Error in handleGeneratePatternPasswords:', error);
+      showAlert('Error', 'Pattern validation failed. Please try again.');
       setLoading(false);
-    }, 500);
+    }
   };
 
-  const handlePasswordChange = (password: string) => {
-    setSelectedPassword(password);
-    setPasswordStrength(calculatePasswordStrength(password));
+    const handlePasswordChange = (password: string) => {
+    console.log('Analyzing password strength for:', password ? 'password entered' : 'empty password');
+    
+    try {
+      setSelectedPassword(password);
+      const strength = calculatePasswordStrength(password);
+      setPasswordStrength(strength);
+      console.log('Password strength calculated successfully');
+    } catch (error) {
+      console.error('Error calculating password strength:', error);
+      setPasswordStrength({
+        score: 0,
+        level: 'Very Weak',
+        color: '#ff4444',
+        entropy: 0,
+        feedback: ['Unable to analyze password'],
+        timeToCrack: 'Unknown'
+      });
+    }
   };
 
   const selectPresetPattern = (pattern: string) => {
@@ -152,18 +227,30 @@ export default function PasswordGenerator() {
     setPatternModalVisible(false);
   };
 
-  useEffect(() => {
-    if (selectedPassword) {
-      setPasswordStrength(calculatePasswordStrength(selectedPassword));
+    useEffect(() => {
+    console.log('useEffect triggered for selectedPassword:', selectedPassword ? 'has value' : 'empty');
+    
+    try {
+      if (selectedPassword) {
+        const strength = calculatePasswordStrength(selectedPassword);
+        setPasswordStrength(strength);
+        console.log('Password strength updated in useEffect');
+      }
+    } catch (error) {
+      console.error('Error in selectedPassword useEffect:', error);
+      setPasswordStrength({
+        score: 0,
+        level: 'Very Weak',
+        color: '#ff4444',
+        entropy: 0,
+        feedback: ['Unable to analyze password'],
+        timeToCrack: 'Unknown'
+      });
     }
   }, [selectedPassword]);
   const copyToClipboard = async (password: string) => {
     try {
-      if (Platform.OS === 'web') {
-        await navigator.clipboard.writeText(password);
-      } else {
-        RNClipboard.setString(password);
-      }
+      await Clipboard.setStringAsync(password);
       showAlert('Success', 'Password copied to clipboard!');
     } catch (error) {
       console.error('Clipboard error:', error);
